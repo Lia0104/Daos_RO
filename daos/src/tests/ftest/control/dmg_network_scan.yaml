@@ -1,0 +1,9 @@
+# change host names to your reserved nodes, the
+# required quantity is indicated by the placeholders
+hosts:
+  test_servers: 1
+timeout: 180
+server_config:
+  name: daos_server
+  port: 10001
+  control_log_mask: INFO

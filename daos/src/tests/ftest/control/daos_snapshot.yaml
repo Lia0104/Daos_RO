@@ -1,0 +1,21 @@
+hosts:
+  test_servers: 1
+timeout: 400
+server_config:
+  name: daos_server
+  servers:
+    targets: 4
+    nr_xs_helpers: 0
+    scm_size: 4
+pool:
+  scm_size: 1G
+  control_method: dmg
+container:
+  control_method: daos
+stress_test: !mux
+  small:
+    snapshot_count: 5
+  medium:
+    snapshot_count: 50
+  high:
+    snapshot_count: 100

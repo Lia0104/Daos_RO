@@ -1,0 +1,11 @@
+# change host names to your reserved nodes, the
+# required quantity is indicated by the placeholders
+hosts:
+  test_servers: 6
+timeout: 140
+timeouts:
+  test_daos_server_dump_on_timeout: 30
+server_config:
+  name: daos_server
+  servers:
+    targets: 2

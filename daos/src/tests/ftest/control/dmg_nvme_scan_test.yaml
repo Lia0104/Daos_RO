@@ -1,0 +1,17 @@
+# change host names to your reserved nodes, the
+# required quantity is indicated by the placeholders
+hosts:
+  test_servers: 1
+timeout: 60
+server_config:
+  name: daos_server
+  port: 10001
+  servers:
+    targets: 4
+    nr_xs_helpers: 0
+    scm_size: 4
+dmg:
+  dmg_sub_command: storage
+  storage:
+    storage_sub_command: scan
+  insecure: False

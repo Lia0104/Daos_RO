@@ -1,0 +1,6 @@
+hosts:
+  test_servers: 1
+timeout: 120
+pool:
+  control_method: dmg
+  scm_size: 1G

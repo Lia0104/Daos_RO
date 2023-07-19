@@ -1,0 +1,40 @@
+hosts:
+  test_servers: 3
+  test_clients: 1
+timeout: 600
+server_config:
+  name: daos_server
+  servers:
+    log_mask: ERR
+    bdev_class: nvme
+    bdev_list: ["aaaa:aa:aa.a","bbbb:bb:bb.b"]
+pool:
+  createmode:
+    mode_RW:
+      mode: 146
+  createset:
+    setname: daos_server
+  createsize:
+    scm_size: 20%
+    nvme_size: 50%
+  createsvc:
+    svcn: 1
+  control_method: dmg
+container:
+  type: POSIX
+  control_method: daos
+ior:
+  api: "DFS"
+  client_processes:
+    np: 1
+  dfs_destroy: False
+  iorflags:
+      flags: "-w -k"
+  repetitions: 1
+  transfersize_blocksize:
+    4K:
+      transfer_size: '4K'
+      block_size: '104857600'  # 100M
+  objectclass:
+    EC_2P1GX:
+      dfs_oclass: "EC_2P1GX"
