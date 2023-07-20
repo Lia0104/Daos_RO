@@ -1094,7 +1094,7 @@ dtx_leader_begin(daos_handle_t coh, struct dtx_id *dti,
 	if (tgt_cnt > 0) {
 		dlh->dlh_future = ABT_FUTURE_NULL;
 		dlh->dlh_subs = (struct dtx_sub_status *)(dlh + 1);
-		for (i = 0; i < tgt_cnt; i++) {
+		for (i = 0; i < tgt_cnt; i++) { //遍历sub tx. sub tx是shard operation tx.
 			dlh->dlh_subs[i].dss_tgt = tgts[i];
 			if (unlikely(tgts[i].st_flags & DTF_DELAY_FORWARD))
 				dlh->dlh_delay_sub_cnt++;
@@ -1832,9 +1832,9 @@ dtx_handle_resend(daos_handle_t coh,  struct dtx_id *dti,
 		 */
 		return -DER_NONEXIST;
 
-	rc = vos_dtx_check(coh, dti, epoch, pm_ver, NULL, NULL, false);
+	rc = vos_dtx_check(coh, dti, epoch, pm_ver, NULL, NULL/*cos cache*/, false);
 	switch (rc) {
-	case DTX_ST_INITED:
+	case DTX_ST_INITED/*0*/:
 		return -DER_INPROGRESS;
 	case DTX_ST_PREPARED:
 		return 0;

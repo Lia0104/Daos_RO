@@ -686,8 +686,8 @@ struct dc_object *obj_hdl2ptr(daos_handle_t oh);
 
 /* handles, pointers for handling I/O */
 struct obj_io_context {
-	struct ds_cont_hdl	*ioc_coh;
-	struct ds_cont_child	*ioc_coc;
+	struct ds_cont_hdl	*ioc_coh;  // global
+	struct ds_cont_child	*ioc_coc;  // per thread
 	struct daos_oclass_attr	 ioc_oca;
 	daos_handle_t		 ioc_vos_coh;
 	uint32_t		 ioc_map_ver;

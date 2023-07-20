@@ -59,7 +59,7 @@ struct obj_iod_array {
 	uint32_t		 oia_oiod_nr;
 	daos_iod_t		*oia_iods;
 	struct dcs_iod_csums	*oia_iod_csums;
-	struct obj_io_desc	*oia_oiods;
+	struct obj_io_desc	*oia_oiods; // for ec obj only
 	/* byte offset array for target, need this info after RPC dispatched
 	 * to specific target server as there is no oiod info already.
 	 * one for each iod, NULL for replica.

@@ -338,6 +338,7 @@ dtx_list_cos(struct ds_cont_child *cont, daos_unit_oid_t *oid,
 	d_iov_set(&kiov, &key, sizeof(key));
 	d_iov_set(&riov, NULL, 0);
 
+	// 在有committable dtx的object中找到key=key的。
 	rc = dbtree_lookup(cont->sc_dtx_cos_hdl, &kiov, &riov);
 	if (rc != 0)
 		return rc == -DER_NONEXIST ? 0 : rc;
@@ -360,8 +361,8 @@ dtx_list_cos(struct ds_cont_child *cont, daos_unit_oid_t *oid,
 	if (dti == NULL)
 		return -DER_NOMEM;
 
-	d_list_for_each_entry(dcrc, &dcr->dcr_prio_list, dcrc_lo_link)
-		dti[i++] = dcrc->dcrc_dte->dte_xid;
+	d_list_for_each_entry(dcrc/*pos*/, &dcr->dcr_prio_list/*head*/, dcrc_lo_link/*member*/)
+		dti[i++] = dcrc->dcrc_dte->dte_xid; //dtx_id
 
 	D_ASSERT(i == count);
 	*dtis = dti;

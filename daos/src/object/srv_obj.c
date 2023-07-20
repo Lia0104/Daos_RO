@@ -101,7 +101,7 @@ obj_gen_dtx_mbs(uint32_t flags, uint32_t *tgt_cnt, struct daos_shard_tgt **p_tgt
 	mbs->dm_data_size = size;
 	mbs->dm_flags = DMF_CONTAIN_LEADER;
 
-	--(*tgt_cnt);
+	--(*tgt_cnt); //?为什么
 	*p_tgts = ++tgts;
 
 	if (!(flags & ORF_EC))
@@ -2434,6 +2434,7 @@ process_epoch(uint64_t *epoch, uint64_t *epoch_first, uint32_t *flags)
 	return PE_OK_LOCAL;
 }
 
+//?应该是只有在leader执行
 void
 ds_obj_rw_handler(crt_rpc_t *rpc)
 {
@@ -2448,7 +2449,7 @@ ds_obj_rw_handler(crt_rpc_t *rpc)
 	struct obj_ec_split_req		*split_req = NULL;
 	struct dtx_memberships		*mbs = NULL;
 	struct daos_shard_tgt		*tgts = NULL;
-	struct dtx_id			*dti_cos = NULL;
+	struct dtx_id			*dti_cos = NULL; // 2 phase commit
 	struct obj_pool_metrics		*opm;
 	int				dti_cos_cnt;
 	uint32_t			tgt_cnt;
@@ -2515,8 +2516,8 @@ ds_obj_rw_handler(crt_rpc_t *rpc)
 		D_GOTO(out, rc);
 	}
 	// update operation
-	tgts = orw->orw_shard_tgts.ca_arrays;
-	tgt_cnt = orw->orw_shard_tgts.ca_count;
+	tgts = orw->orw_shard_tgts.ca_arrays;//daos_shard_tgt
+	tgt_cnt = orw->orw_shard_tgts.ca_count;//
 
 	if (!daos_is_zero_dti(&orw->orw_dti) && tgt_cnt != 0) {
 		rc = obj_gen_dtx_mbs(orw->orw_flags, &tgt_cnt, &tgts, &mbs);  //获取dtx涉及到的tgt member
@@ -2542,17 +2543,17 @@ ds_obj_rw_handler(crt_rpc_t *rpc)
 
 again1:
 		e = 0;
-		rc = dtx_handle_resend(ioc.ioc_vos_coh, &orw->orw_dti,
+		rc = dtx_handle_resend(ioc.ioc_vos_coh, &orw->orw_dti/*dtx id*/,
 				       &e, &version);
 		switch (rc) {
-		case -DER_ALREADY:
+		case -DER_ALREADY: //已经是commited或committable的
 			D_GOTO(out, rc = 0);
 		case 0:
 			flags |= ORF_RESEND;
 			orw->orw_epoch = e;
 			/* TODO: Also recover the epoch uncertainty. */
 			break;
-		case -DER_NONEXIST:
+		case -DER_NONEXIST: //？
 			rc = 0;
 			break;
 		default:
@@ -2564,8 +2565,8 @@ again1:
 	}
 
 again2:
-	if (orw->orw_iod_array.oia_oiods != NULL && split_req == NULL) {
-		rc = obj_ec_rw_req_split(orw->orw_oid, &orw->orw_iod_array, orw->orw_nr,   //request split
+	if (orw->orw_iod_array.oia_oiods/*ec iod*/ != NULL && split_req == NULL) {
+		rc = obj_ec_rw_req_split(orw->orw_oid, &orw->orw_iod_array, orw->orw_nr,   //for EC obj request dispatching, the leader split request
 					 orw->orw_start_shard, orw->orw_tgt_max, PO_COMP_ID_ALL,
 					 NULL, 0, &ioc.ioc_oca, tgt_cnt, tgts, &split_req, opm);
 		if (rc != 0) {
@@ -2582,9 +2583,9 @@ again2:
 	 * them before real modifications to avoid availability issues.
 	 */
 	D_FREE(dti_cos);
-	dti_cos_cnt = dtx_list_cos(ioc.ioc_coc, &orw->orw_oid,  //commitable DTX
+	dti_cos_cnt = dtx_list_cos(ioc.ioc_coc/*container child*/, &orw->orw_oid/*obj unit id*/,  //commitable DTX
 				   orw->orw_dkey_hash, DTX_THRESHOLD_COUNT,
-				   &dti_cos);
+				   &dti_cos/*dtx id list*/);
 	if (dti_cos_cnt < 0)
 		D_GOTO(out, rc = dti_cos_cnt);
 
