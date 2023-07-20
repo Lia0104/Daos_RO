@@ -612,7 +612,7 @@ struct daos_recx_ep_list {
 	bool			 re_snapshot;
 	/** epoch valid flag, re_items' re_ep can be ignored when it is false */
 	bool			 re_ep_valid;
-	struct daos_recx_ep	*re_items;
+	struct daos_recx_ep	*re_items;//recored extent and epoch
 };
 
 static inline void

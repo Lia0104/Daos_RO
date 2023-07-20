@@ -2471,7 +2471,7 @@ ds_obj_rw_handler(crt_rpc_t *rpc)
 
 	D_DEBUG(DB_IO,
 		"rpc %p opc %d oid "DF_UOID" dkey "DF_KEY" tag/xs %d/%d epc "
-		DF_X64", pmv %u/%u dti "DF_DTI".\n",
+		DF_X64", pmv %u/%u dti "DF_DTI".\n", 
 		rpc, opc, DP_UOID(orw->orw_oid), DP_KEY(&orw->orw_dkey),
 		dss_get_module_info()->dmi_tgt_id,
 		dss_get_module_info()->dmi_xs_id, orw->orw_epoch,
@@ -2486,8 +2486,9 @@ ds_obj_rw_handler(crt_rpc_t *rpc)
 	if (rc == PE_OK_LOCAL)
 		orw->orw_flags &= ~ORF_EPOCH_UNCERTAIN;
 
+	// fetch operation
 	if (obj_rpc_is_fetch(rpc)) {
-		struct dtx_handle	*dth;//在这里开启DTX
+		struct dtx_handle	*dth;
 
 		if (orw->orw_flags & ORF_CSUM_REPORT) {
 			obj_log_csum_err();
@@ -2513,7 +2514,7 @@ ds_obj_rw_handler(crt_rpc_t *rpc)
 
 		D_GOTO(out, rc);
 	}
-
+	// update operation
 	tgts = orw->orw_shard_tgts.ca_arrays;
 	tgt_cnt = orw->orw_shard_tgts.ca_count;
 
