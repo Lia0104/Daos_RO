@@ -206,6 +206,7 @@ struct vos_dtx_act_ent_df {
 	umem_off_t			dae_mbs_off;
 };
 
+// used to store dtx entry?
 struct vos_dtx_blob_df {
 	/** Magic number, can be used to distinguish active or committed DTX. */
 	int					dbd_magic;

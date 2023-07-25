@@ -2434,7 +2434,7 @@ process_epoch(uint64_t *epoch, uint64_t *epoch_first, uint32_t *flags)
 	return PE_OK_LOCAL;
 }
 
-//?应该是只有在leader执行
+//应该是只有在leader执行
 void
 ds_obj_rw_handler(crt_rpc_t *rpc)
 {
@@ -2543,7 +2543,7 @@ ds_obj_rw_handler(crt_rpc_t *rpc)
 
 again1:
 		e = 0;
-		rc = dtx_handle_resend(ioc.ioc_vos_coh, &orw->orw_dti/*dtx id*/,
+		rc = dtx_handle_resend(ioc.ioc_vos_coh, &orw->orw_dti/*dtx id*/, //Check whether the given DTX is resent one or not.
 				       &e, &version);
 		switch (rc) {
 		case -DER_ALREADY: //已经是commited或committable的
@@ -2581,6 +2581,7 @@ again2:
 	 * CoS (committable) cache, piggyback them via the dispdatched
 	 * RPC to non-leaders. Then the non-leader replicas can commit
 	 * them before real modifications to avoid availability issues.
+	 * 从committable cache中找到有冲突的DTX
 	 */
 	D_FREE(dti_cos);
 	dti_cos_cnt = dtx_list_cos(ioc.ioc_coc/*container child*/, &orw->orw_oid/*obj unit id*/,  //commitable DTX
@@ -2619,6 +2620,7 @@ again2:
 		D_GOTO(out, rc);
 	}
 
+	//ds_obj_exec_arg
 	exec_arg.rpc = rpc;
 	exec_arg.ioc = &ioc;
 	exec_arg.args = split_req;

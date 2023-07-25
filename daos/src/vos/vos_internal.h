@@ -287,6 +287,7 @@ struct vos_container {
 	unsigned int		vc_open_count;
 };
 
+//dtx active entry
 struct vos_dtx_act_ent {
 	struct vos_dtx_act_ent_df	 dae_base;
 	umem_off_t			 dae_df_off;

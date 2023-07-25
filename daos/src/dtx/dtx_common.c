@@ -1099,16 +1099,16 @@ dtx_leader_begin(daos_handle_t coh, struct dtx_id *dti,
 			if (unlikely(tgts[i].st_flags & DTF_DELAY_FORWARD))
 				dlh->dlh_delay_sub_cnt++;
 		}
-		dlh->dlh_normal_sub_cnt = tgt_cnt - dlh->dlh_delay_sub_cnt;
+		dlh->dlh_normal_sub_cnt = tgt_cnt - dlh->dlh_delay_sub_cnt; //sub tx(shard operation) count
 	}
 
 	dth = &dlh->dlh_handle;
 	rc = dtx_handle_init(dti, coh, epoch, sub_modification_cnt, pm_ver,   //Init local dth handle.
-			     leader_oid, dti_cos, dti_cos_cnt, mbs, true,
-			     (flags & DTX_SOLO) ? true : false,
+			     leader_oid, dti_cos, dti_cos_cnt, mbs, true/*bool leader*/,
+			     (flags & DTX_SOLO) ? true : false/*bool solo*/,
 			     (flags & DTX_SYNC) ? true : false,
 			     (flags & DTX_DIST) ? true : false,
-			     (flags & DTX_FOR_MIGRATION) ? true : false, false,
+			     (flags & DTX_FOR_MIGRATION) ? true : false, false/*ignore_uncommitted*/,
 			     (flags & DTX_RESEND) ? true : false,
 			     (flags & DTX_PREPARED) ? true : false, dth);
 	if (rc == 0 && sub_modification_cnt > 0)
@@ -1185,12 +1185,12 @@ dtx_leader_end(struct dtx_leader_handle *dlh, struct ds_cont_hdl *coh, int resul
 	if (daos_is_zero_dti(&dth->dth_xid))
 		D_GOTO(out, result = result < 0 ? result : rc);
 
-	if (dth->dth_need_validation) {
+	if (dth->dth_need_validation) {//validation before commit/commitable
 		/* During waiting for bulk data transfer or other non-leaders, the DTX
 		 * status may be changes by others (such as DTX resync or DTX refresh)
 		 * by race. Let's check it.
 		 */
-		status = vos_dtx_validation(dth);
+		status = vos_dtx_validation(dth); //DTX status. prepared/commitable/abort/...
 		if (unlikely(status == DTX_ST_COMMITTED || status == DTX_ST_COMMITTABLE))
 			D_GOTO(out, result = 0);
 	}
@@ -1445,7 +1445,7 @@ dtx_begin(daos_handle_t coh, struct dtx_id *dti,
 			     (flags & DTX_DIST) ? true : false,
 			     (flags & DTX_FOR_MIGRATION) ? true : false,
 			     (flags & DTX_IGNORE_UNCOMMITTED) ? true : false,
-			     (flags & DTX_RESEND) ? true : false, false, dth);
+			     (flags & DTX_RESEND) ? true : false, false/*prerared*/, dth);
 	if (rc == 0 && sub_modification_cnt > 0)
 		rc = vos_dtx_attach(dth, false, false);
 
@@ -1472,6 +1472,7 @@ dtx_end(struct dtx_handle *dth, struct ds_cont_child *cont, int result)
 	if (daos_is_zero_dti(&dth->dth_xid))
 		goto out;
 
+	//dtx并没有成功，但需要执行commit逻辑
 	if (result < 0) {
 		if (dth->dth_dti_cos_count > 0 && !dth->dth_cos_done) {
 			int	rc;
@@ -1923,7 +1924,7 @@ dtx_leader_exec_ops_normal_ult(void *arg)
 	struct dtx_leader_handle	*dlh = ult_arg->dlh;
 	struct dtx_sub_status		*sub;
 	ABT_future			 future = dlh->dlh_future;
-	uint32_t			 sub_cnt = dlh->dlh_normal_sub_cnt + dlh->dlh_delay_sub_cnt;
+	uint32_t			 sub_cnt = dlh->dlh_normal_sub_cnt + dlh->dlh_delay_sub_cnt;//sub shard tx(for shard targt update/fetch) count.
 	uint32_t			 i, j;
 	int				 rc = 0;
 
@@ -1943,7 +1944,7 @@ dtx_leader_exec_ops_normal_ult(void *arg)
 			goto next;
 		}
 
-		rc = ult_arg->func(dlh, ult_arg->func_arg, i, dtx_sub_comp_cb); //这个func作什么？
+		rc = ult_arg->func(dlh, ult_arg->func_arg, i, dtx_sub_comp_cb); //tgt update function
 		if (rc != 0) {
 			if (sub->dss_comp == 0)
 				dtx_sub_comp_cb(dlh, i, rc);
@@ -1993,7 +1994,7 @@ dtx_leader_exec_ops_delay_ult(void *arg)
 	D_ASSERT(future != ABT_FUTURE_NULL);
 	for (i = 0, j = 0; i < sub_cnt; i++, j++) {
 		sub = &dlh->dlh_subs[i];
-		if (!(sub->dss_tgt.st_flags & DTF_DELAY_FORWARD))
+		if (!(sub->dss_tgt.st_flags & DTF_DELAY_FORWARD)) //不是delay的跳过
 			continue;
 
 		sub->dss_result = 0;
@@ -2084,7 +2085,8 @@ dtx_leader_exec_ops(struct dtx_leader_handle *dlh, dtx_sub_func_t func,
 	 * XXX: Ideally, we probably should create ULT for each shard, but for performance
 	 *	reasons, let's only create one for all remote targets for now.
 	 */
-	rc = dss_ult_create(dtx_leader_exec_ops_normal_ult, &ult_arg, DSS_XS_IOFW,  //创建用户级线程来执行dtx_leader1_exec_ops_normal_ult指向的
+	// run func on all remote shard tgts with a ult.
+	rc = dss_ult_create(dtx_leader_exec_ops_normal_ult/*func*/, &ult_arg, DSS_XS_IOFW,  
 			    dss_get_module_info()->dmi_tgt_id, DSS_DEEP_STACK_SZ, NULL);
 	if (rc != 0) {
 		D_ERROR("ult create failed (2): "DF_RC"\n", DP_RC(rc));
@@ -2099,7 +2101,7 @@ exec:
 
 	/* Even the local request failure, we still need to wait for remote sub request. */
 	if (dlh->dlh_normal_sub_cnt > 0) {
-		rc1 = dtx_leader_wait(dlh);
+		rc1 = dtx_leader_wait(dlh);  //等待futere子任务都完成
 		if (unlikely(rc1 == -DER_ALREADY))
 			rc1 = 0;
 	}
@@ -2107,7 +2109,7 @@ exec:
 	if (rc != 0)
 		return rc;
 
-	if (rc1 != 0 || likely(dlh->dlh_delay_sub_cnt == 0))
+	if (rc1 != 0 || likely(dlh->dlh_delay_sub_cnt == 0)) //remote sub tx没有完全成功
 		return rc1;
 
 	/* For delay forward sub requests. */
@@ -2133,7 +2135,7 @@ exec:
 		return dss_abterr2der(rc);
 	}
 
-	rc = dss_ult_create(dtx_leader_exec_ops_delay_ult, ult_arg, DSS_XS_IOFW,//创建ULT执行arg1，arg1执行func
+	rc = dss_ult_create(dtx_leader_exec_ops_delay_ult/*func*/, ult_arg, DSS_XS_IOFW,//创建ULT执行arg1，arg1执行func
 			    dss_get_module_info()->dmi_tgt_id, DSS_DEEP_STACK_SZ, NULL);
 	if (rc != 0) {
 		D_ERROR("ult create failed (4): "DF_RC"\n", DP_RC(rc));

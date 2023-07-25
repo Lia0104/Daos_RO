@@ -1586,6 +1586,7 @@ handle_df:
 	}
 }
 
+// mark the dtx prepared
 int
 vos_dtx_prepared(struct dtx_handle *dth, struct vos_dtx_cmt_ent **dce_p)
 {
@@ -1642,6 +1643,7 @@ vos_dtx_prepared(struct dtx_handle *dth, struct vos_dtx_cmt_ent **dce_p)
 	    (dth->dth_modification_cnt > 0))
 		dth->dth_sync = 1;
 
+	//more than one object to be modified
 	if (dth->dth_oid_array != NULL) {
 		D_ASSERT(dth->dth_oid_cnt > 0);
 
@@ -1666,9 +1668,10 @@ vos_dtx_prepared(struct dtx_handle *dth, struct vos_dtx_cmt_ent **dce_p)
 		dae->dae_oid_cnt = 1;
 	}
 
+	//merbership
 	if (DAE_MBS_DSIZE(dae) <= sizeof(DAE_MBS_INLINE(dae))) {
-		memcpy(DAE_MBS_INLINE(dae), dth->dth_mbs->dm_data,
-		       DAE_MBS_DSIZE(dae));
+		memcpy(DAE_MBS_INLINE(dae)/*dest*/, dth->dth_mbs->dm_data/*src*/,
+		       DAE_MBS_DSIZE(dae)/*n*/);
 	} else {
 		rec_off = umem_zalloc(umm, DAE_MBS_DSIZE(dae));
 		if (umoff_is_null(rec_off)) {
@@ -2850,21 +2853,22 @@ vos_dtx_attach(struct dtx_handle *dth, bool persistent, bool exist)
 	cont = vos_hdl2cont(dth->dth_coh);
 	D_ASSERT(cont != NULL);
 
-	if (dth->dth_ent != NULL) {
+	//从Active-DTX-Tree中找到dtx id的DTX entry
+	if (dth->dth_ent != NULL) { //pointer to DTX entry of the DTX
 		if (!persistent || dth->dth_active)
 			return 0;
 	} else {
 		D_ASSERT(dth->dth_pinned == 0);
 
 		if (exist) {
-			d_iov_set(&kiov, &dth->dth_xid, sizeof(dth->dth_xid));
+			d_iov_set(&kiov, &dth->dth_xid/*dtx id*/, sizeof(dth->dth_xid));
 			d_iov_set(&riov, NULL, 0);
 			rc = dbtree_lookup(cont->vc_dtx_active_hdl, &kiov, &riov);
 			if (rc != 0)
 				goto out;
 
-			dae = riov.iov_buf;
-			if (dae->dae_dth == NULL)
+			dae = riov.iov_buf; //dtx active entry
+			if (dae->dae_dth == NULL)  //back pointer to the DTX
 				dae->dae_dth = dth;
 			else
 				D_ASSERT(dae->dae_dth == dth);
@@ -2885,9 +2889,9 @@ vos_dtx_attach(struct dtx_handle *dth, bool persistent, bool exist)
 			goto out;
 
 		began = true;
-		dbd = umem_off2ptr(umm, cont_df->cd_dtx_active_tail);
+		dbd = umem_off2ptr(umm, cont_df->cd_dtx_active_tail); //dbd类似地址，与PMDK相关
 		if (dbd == NULL || dbd->dbd_index >= dbd->dbd_cap) {
-			rc = vos_dtx_extend_act_table(cont);
+			rc = vos_dtx_extend_act_table(cont); //扩容
 			if (rc != 0)
 				return rc;
 
@@ -2911,7 +2915,7 @@ out:
 	if (rc == 0) {
 		if (persistent) {
 			dth->dth_active = 1;
-			rc = vos_dtx_prepared(dth, &dce);
+			rc = vos_dtx_prepared(dth, &dce);//Mark the DTX as prepared locally.
 		} else {
 			dth->dth_pinned = 1;
 		}

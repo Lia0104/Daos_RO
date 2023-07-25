@@ -164,7 +164,7 @@ struct dtx_leader_handle {
 	uint32_t			dlh_normal_sub_cnt;
 	/* How many delay forward sub request. */
 	uint32_t			dlh_delay_sub_cnt;
-	/* Sub transaction handle to manage the dtx leader */
+	/* Sub transaction handle to manage the dtx leader */  //tgt transaction
 	struct dtx_sub_status		*dlh_subs;
 	dtx_agg_cb_t			dlh_agg_cb;
 	void				*dlh_agg_cb_arg;
