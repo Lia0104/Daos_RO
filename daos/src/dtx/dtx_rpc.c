@@ -602,7 +602,7 @@ static int
 dtx_rpc_internal(struct ds_cont_child *cont, d_list_t *head, struct btr_root *tree_root,
 		 daos_handle_t *tree_hdl, struct dtx_req_args *dra, struct dtx_id dtis[],
 		 struct dtx_entry **dtes, daos_epoch_t epoch, int count, int opc,
-		 int *committed, d_rank_t my_rank, uint32_t my_tgtid)
+		 int *committed, d_rank_t my_rank/*in*/, uint32_t my_tgtid/*in*/)
 {
 	struct ds_pool		*pool;
 	int			 length = 0;
@@ -623,8 +623,10 @@ dtx_rpc_internal(struct ds_cont_child *cont, d_list_t *head, struct btr_root *tr
 			return rc;
 	}
 
+	//classify
 	ABT_rwlock_rdlock(pool->sp_lock);
 	for (i = 0; i < count; i++) {
+		//classify dte[i]，得到dte的rank、target id？
 		rc = dtx_classify_one(pool, *tree_hdl, head, &length, dtes[i], count,
 				      my_rank, my_tgtid);
 		if (rc < 0) {
@@ -645,7 +647,7 @@ dtx_rpc_internal(struct ds_cont_child *cont, d_list_t *head, struct btr_root *tr
 
 	D_ASSERT(length > 0);
 
-	return dtx_req_list_send(dra, opc, committed, head, length, pool->sp_uuid,
+	return dtx_req_list_send(dra, opc, committed, head/*遍历head所指向的list*/, length, pool->sp_uuid,
 				 cont->sc_uuid, epoch, NULL, NULL, NULL, NULL);
 }
 
@@ -723,10 +725,10 @@ dtx_rpc_prep(struct ds_cont_child *cont, d_list_t *head, struct btr_root *tree_r
 			int	i;
 
 			for (i = 0; i < count; i++)
-				dtis[i] = dtes[i]->dte_xid;
+				dtis[i] = dtes[i]->dte_xid;// DTX id list
 		}
 	} else {
-		rc = dtx_rpc_internal(cont, head, tree_root, tree_hdl, dra, dtis, dtes, epoch,
+		rc = dtx_rpc_internal(cont, head/*list*/, tree_root, tree_hdl, dra, dtis/*count个*/, dtes, epoch,
 				      count, opc, committed, my_rank, my_tgtid);
 	}
 
@@ -779,7 +781,7 @@ dtx_rpc_post(d_list_t *head, daos_handle_t *tree_hdl, struct dtx_req_args *dra,
  */
 int
 dtx_commit(struct ds_cont_child *cont, struct dtx_entry **dtes,
-	   struct dtx_cos_key *dcks, int count)
+	   struct dtx_cos_key *dcks, int count/*dtes count*/)
 {
 	d_list_t		 head;
 	struct btr_root		 tree_root = { 0 };
@@ -803,8 +805,8 @@ dtx_commit(struct ds_cont_child *cont, struct dtx_entry **dtes,
 		dtis = &dti;
 	}
 
-	rc = dtx_rpc_prep(cont, &head, &tree_root, &tree_hdl, &dra, &helper, dtis,
-			  dtes, 0, count, DTX_COMMIT, &committed);
+	rc = dtx_rpc_prep(cont, &head/*[out]*/, &tree_root, &tree_hdl, &dra, &helper, dtis/*count个*/,
+			  dtes/*count个*/, 0, count, DTX_COMMIT, &committed);
 
 	/*
 	 * NOTE: Before committing the DTX on remote participants, we cannot remove the active
@@ -830,6 +832,7 @@ dtx_commit(struct ds_cont_child *cont, struct dtx_entry **dtes,
 		if (committed > 0)
 			rc1 = vos_dtx_set_flags(cont->sc_hdl, dtis, count, DTE_PARTIAL_COMMITTED);
 	} else {
+		//本地的commit操作
 		if (dcks != NULL) {
 			if (count > 1) {
 				D_ALLOC_ARRAY(rm_cos, count);

@@ -300,7 +300,7 @@ struct umem_attr {
 /** instance of an unified memory class */
 struct umem_instance {
 	umem_class_id_t		 umm_id;
-	int			 umm_nospc_rc;
+	int			 umm_nospc_rc; //没有足够空间的错误码
 	const char		*umm_name;
 #ifdef DAOS_PMEM_BUILD
 	PMEMobjpool		*umm_pool;
@@ -310,7 +310,7 @@ struct umem_instance {
 	/** Cache the pool id field for umem addresses */
 	uint64_t		 umm_pool_uuid_lo;
 	/** Cache the base address of the pool */
-	uint64_t		 umm_base;
+	uint64_t		 umm_base;  //pool base address
 	/** class member functions */
 	umem_ops_t		*umm_ops;
 #ifdef DAOS_PMEM_BUILD

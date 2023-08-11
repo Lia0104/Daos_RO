@@ -245,6 +245,7 @@ d_list_splice_init(d_list_t *list, d_list_t *head)
 #define d_list_entry(ptr, type, member) \
 	((type *)((char *)(ptr)-(char *)(&((type *)0)->member)))
 
+//从list中弹出链表头元素
 #define d_list_pop_entry(list, type, member)			\
 	({							\
 		type *__r = NULL;				\

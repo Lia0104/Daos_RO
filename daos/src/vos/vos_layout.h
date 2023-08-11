@@ -215,7 +215,7 @@ struct vos_dtx_blob_df {
 	/** Already filled slots count. */
 	int					dbd_count;
 	/** The next available slot for active DTX entry in the blob. */
-	int					dbd_index;
+	int					dbd_index; //1个slot用来放置1个entry
 	/** Prev dtx_scm_blob. */
 	umem_off_t				dbd_prev;
 	/** Next dtx_scm_blob. */

@@ -407,6 +407,7 @@ dtx_add_cos(struct ds_cont_child *cont, struct dtx_entry *dte,
 	return rc;
 }
 
+// 删除Cos cache中属于xid的entry
 int
 dtx_del_cos(struct ds_cont_child *cont, struct dtx_id *xid,
 	    daos_unit_oid_t *oid, uint64_t dkey_hash)
@@ -448,7 +449,7 @@ dtx_del_cos(struct ds_cont_child *cont, struct dtx_id *xid,
 	}
 
 	d_list_for_each_entry(dcrc, &dcr->dcr_reg_list, dcrc_lo_link) {
-		if (memcmp(&dcrc->dcrc_dte->dte_xid, xid, sizeof(*xid)) != 0)
+		if (memcmp(&dcrc->dcrc_dte->dte_xid, xid, sizeof(*xid)) != 0)  //不相等
 			continue;
 
 		d_list_del(&dcrc->dcrc_gl_committable);

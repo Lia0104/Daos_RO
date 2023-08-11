@@ -767,6 +767,7 @@ dtx_shares_fini(struct dtx_handle *dth)
 	if (!dth->dth_shares_inited)
 		return;
 
+	//循环，从dth_share_cmt_list从弹出对象，进行free从操作
 	while ((dsp = d_list_pop_entry(&dth->dth_share_cmt_list,
 				       struct dtx_share_peer,
 				       dsp_link)) != NULL)
@@ -862,7 +863,7 @@ dtx_handle_init(struct dtx_id *dti, daos_handle_t coh, struct dtx_epoch *epoch,
 	dth->dth_already = 0;
 	dth->dth_need_validation = 0;
 
-	dth->dth_dti_cos = dti_cos;
+	dth->dth_dti_cos = dti_cos; // cos dtx list
 	dth->dth_dti_cos_count = dti_cos_cnt;
 	dth->dth_ent = NULL;
 	dth->dth_flags = leader ? DTE_LEADER : 0;
@@ -1171,6 +1172,7 @@ dtx_leader_end(struct dtx_leader_handle *dlh, struct ds_cont_hdl *coh, int resul
 
 	D_ASSERT(cont != NULL);
 
+	//释放dth中的shard-active/committed/abort-list
 	dtx_shares_fini(dth);
 
 	if (unlikely(result == -DER_ALREADY))
@@ -1235,6 +1237,9 @@ dtx_leader_end(struct dtx_leader_handle *dlh, struct ds_cont_hdl *coh, int resul
 	 * possible that the DTX resync ULT may have aborted or committed
 	 * the DTX during current ULT waiting for other non-leaders' reply.
 	 * Let's check DTX status locally before marking as 'committable'.
+	 * 当前DTX在数据同步开始前开始，因此数据同步的ULT可能在当前DTX等待其他节点回复
+	 * 的时候abort或者commit当前DTX，所以需要在标记为committable之前重新check该DTX的本地状态
+	 * 
 	 */
 	if (dth->dth_ver < cont->sc_dtx_resync_ver) {
 		rc = vos_dtx_check(cont->sc_hdl, &dth->dth_xid, NULL, NULL, NULL, NULL, false);
@@ -1283,6 +1288,7 @@ dtx_leader_end(struct dtx_leader_handle *dlh, struct ds_cont_hdl *coh, int resul
 	/* For synchronous DTX, do not add it into CoS cache, otherwise,
 	 * we may have no way to remove it from the cache.
 	 */
+	// 走sync和走cos，两条路
 	if (dth->dth_sync)
 		goto sync;
 
@@ -1290,7 +1296,7 @@ dtx_leader_end(struct dtx_leader_handle *dlh, struct ds_cont_hdl *coh, int resul
 
 	size = sizeof(*dte) + sizeof(*mbs) + dth->dth_mbs->dm_data_size;
 	D_ALLOC(dte, size);
-	if (dte == NULL) {
+	if (dte == NULL) {//没有alloc
 		dth->dth_sync = 1;
 		goto sync;
 	}
@@ -1313,7 +1319,7 @@ dtx_leader_end(struct dtx_leader_handle *dlh, struct ds_cont_hdl *coh, int resul
 		flags = DCF_SHARED;
 	else
 		flags = 0;
-	rc = dtx_add_cos(cont, dte, &dth->dth_leader_oid,
+	rc = dtx_add_cos(cont, dte, &dth->dth_leader_oid,    //
 			 dth->dth_dkey_hash, dth->dth_epoch, flags);
 	dtx_entry_put(dte);
 	if (rc == 0) {
@@ -1332,7 +1338,8 @@ dtx_leader_end(struct dtx_leader_handle *dlh, struct ds_cont_hdl *coh, int resul
 	}
 
 sync:
-	if (dth->dth_sync) {
+	//进入sync部分也需要dth->dth_sync==1才会执行代码
+	if (dth->dth_sync) { //commit synchronously.
 		/*
 		 * TBD: We need to reserve some space to guarantee that the local commit can be
 		 *	done successfully. That is not only for sync commit, but also for async
@@ -1340,7 +1347,7 @@ sync:
 		 */
 		vos_dtx_mark_committable(dth);
 		dte = &dth->dth_dte;
-		rc = dtx_commit(cont, &dte, NULL, 1);
+		rc = dtx_commit(cont, &dte, NULL, 1/*dte count*/);
 		if (rc != 0)
 			D_WARN(DF_UUID": Fail to sync commit DTX "DF_DTI": "DF_RC"\n",
 			       DP_UUID(cont->sc_uuid), DP_DTI(&dth->dth_xid), DP_RC(rc));
@@ -1376,7 +1383,7 @@ out:
 			vos_dtx_cleanup(dth, true);
 
 		vos_dtx_rsrvd_fini(dth);
-		vos_dtx_detach(dth);
+		vos_dtx_detach(dth); //将active entry和dtx解绑
 
 		D_DEBUG(DB_IO,
 			"Stop the DTX "DF_DTI" ver %u, dkey %lu, %s, "
@@ -1393,11 +1400,12 @@ out:
 	D_ASSERTF(result <= 0, "unexpected return value %d\n", result);
 
 	/* Local modification is done, then need to handle CoS cache. */
+	// 普通的add to cos cache应该是不满足if条件的
 	if (dth->dth_cos_done) {
 		int	i;
 
 		for (i = 0; i < dth->dth_dti_cos_count; i++)
-			dtx_del_cos(cont, &dth->dth_dti_cos[i],
+			dtx_del_cos(cont, &dth->dth_dti_cos[i],  //删除Cos cache中属于xid的entry
 				    &dth->dth_leader_oid, dth->dth_dkey_hash);
 	}
 

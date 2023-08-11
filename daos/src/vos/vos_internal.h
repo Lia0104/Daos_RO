@@ -289,8 +289,8 @@ struct vos_container {
 
 //dtx active entry
 struct vos_dtx_act_ent {
-	struct vos_dtx_act_ent_df	 dae_base;
-	umem_off_t			 dae_df_off;
+	struct vos_dtx_act_ent_df	 dae_base;  //可以持久化放入pm中的部分
+	umem_off_t			 dae_df_off; //SCM中的地址
 	struct vos_dtx_blob_df		*dae_dbd;
 	/* More DTX records if out of the inlined buffer. */
 	umem_off_t			*dae_records;

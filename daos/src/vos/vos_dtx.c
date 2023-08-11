@@ -787,7 +787,7 @@ vos_dtx_commit_one(struct vos_container *cont, struct dtx_id *dti, daos_epoch_t 
 			rc = dbtree_lookup(cont->vc_dtx_committed_hdl,
 					   &kiov, &riov);
 			if (rc == 0) {
-				dce = (struct vos_dtx_cmt_ent *)riov.iov_buf;
+				dce = (struct vos_dtx_cmt_ent *)riov.iov_buf; // committed dtx entry
 				if (dce->dce_invalid) {
 					dce = NULL;
 					D_GOTO(out, rc = -DER_NONEXIST);
@@ -828,10 +828,10 @@ vos_dtx_commit_one(struct vos_container *cont, struct dtx_id *dti, daos_epoch_t 
 	if (dce == NULL)
 		D_GOTO(out, rc = -DER_NOMEM);
 
-	DCE_CMT_TIME(dce) = cmt_time;
+	DCE_CMT_TIME(dce) = cmt_time; //(dce)->dce_base.dce_cmt_time
 	if (dae != NULL) {
-		DCE_XID(dce) = DAE_XID(dae);
-		DCE_EPOCH(dce) = DAE_EPOCH(dae);
+		DCE_XID(dce) = DAE_XID(dae); //dtx id
+		DCE_EPOCH(dce) = DAE_EPOCH(dae);//dtx epoch
 	} else {
 		struct dtx_handle	*dth = vos_dth_get();
 
@@ -842,7 +842,7 @@ vos_dtx_commit_one(struct vos_container *cont, struct dtx_id *dti, daos_epoch_t 
 	}
 
 	d_iov_set(&riov, dce, sizeof(*dce));
-	rc = dbtree_upsert(cont->vc_dtx_committed_hdl, BTR_PROBE_EQ,
+	rc = dbtree_upsert(cont->vc_dtx_committed_hdl, BTR_PROBE_EQ, //往dtx committed tree中插入
 			   DAOS_INTENT_UPDATE, &kiov, &riov, NULL);
 	if (rc != 0)
 		goto out;
@@ -954,6 +954,7 @@ vos_dtx_extend_act_table(struct vos_container *cont)
 	return 0;
 }
 
+// alloc a dtx active entry
 static int
 vos_dtx_alloc(struct vos_dtx_blob_df *dbd, struct dtx_handle *dth)
 {
@@ -976,9 +977,9 @@ vos_dtx_alloc(struct vos_dtx_blob_df *dbd, struct dtx_handle *dth)
 	}
 
 	D_INIT_LIST_HEAD(&dae->dae_link);
-	DAE_LID(dae) = idx + DTX_LID_RESERVED;
-	DAE_XID(dae) = dth->dth_xid;
-	DAE_OID(dae) = dth->dth_leader_oid;
+	DAE_LID(dae) = idx + DTX_LID_RESERVED;//DTX entry local id
+	DAE_XID(dae) = dth->dth_xid;// DTX id
+	DAE_OID(dae) = dth->dth_leader_oid;// object unit id
 	DAE_DKEY_HASH(dae) = dth->dth_dkey_hash;
 	DAE_EPOCH(dae) = dth->dth_epoch;
 	DAE_FLAGS(dae) = dth->dth_flags;
@@ -1670,6 +1671,7 @@ vos_dtx_prepared(struct dtx_handle *dth, struct vos_dtx_cmt_ent **dce_p)
 
 	//merbership
 	if (DAE_MBS_DSIZE(dae) <= sizeof(DAE_MBS_INLINE(dae))) {
+		//member列表个数能放在inline数组中
 		memcpy(DAE_MBS_INLINE(dae)/*dest*/, dth->dth_mbs->dm_data/*src*/,
 		       DAE_MBS_DSIZE(dae)/*n*/);
 	} else {
@@ -1919,13 +1921,15 @@ vos_dtx_commit_internal(struct vos_container *cont, struct dtx_id dtis[],
 		goto new_blob;
 
 again:
+	//遍历dtx list
 	for (j = dbd->dbd_count; i < count && j < dbd->dbd_cap && rc1 == 0;
 	     i++, cur++) {
 		struct vos_dtx_cmt_ent	*dce = NULL;
 
 		rc = vos_dtx_commit_one(cont, &dtis[cur], epoch, cmt_time, &dce,
-					daes != NULL ? &daes[cur] : NULL,
-					rm_cos != NULL ? &rm_cos[cur] : NULL, &fatal);
+					daes != NULL ? &daes[cur] : NULL/*dae*/,
+					rm_cos != NULL ? &rm_cos[cur] : NULL, 
+					&fatal);
 		if (dces != NULL)
 			dces[cur] = dce;
 
@@ -1942,8 +1946,8 @@ again:
 			rc1 = rc;
 
 		if (dce != NULL)
-			dtx_memcpy_nodrain(umm, &dbd->dbd_committed_data[j++],
-					   &dce->dce_base,
+			dtx_memcpy_nodrain(umm, &dbd->dbd_committed_data[j++]/*dest*/,
+					   &dce->dce_base/*src*/,
 					   sizeof(struct vos_dtx_cmt_ent_df));
 	}
 
@@ -2114,7 +2118,7 @@ vos_dtx_commit(daos_handle_t coh, struct dtx_id dtis[], int count, bool rm_cos[]
 	/* Commit multiple DTXs via single PMDK transaction. */
 	rc = umem_tx_begin(vos_cont2umm(cont), NULL);
 	if (rc == 0) {
-		committed = vos_dtx_commit_internal(cont, dtis, count, 0, rm_cos, daes, dces);
+		committed = vos_dtx_commit_internal(cont, dtis, count, 0/*epoch*/, rm_cos, daes, dces);
 		rc = umem_tx_end(vos_cont2umm(cont),
 				 committed > 0 ? 0 : committed);
 		if (rc == 0)
@@ -2860,13 +2864,14 @@ vos_dtx_attach(struct dtx_handle *dth, bool persistent, bool exist)
 	} else {
 		D_ASSERT(dth->dth_pinned == 0);
 
-		if (exist) {
+		if (exist) { /*related DTX entry exists*/
 			d_iov_set(&kiov, &dth->dth_xid/*dtx id*/, sizeof(dth->dth_xid));
 			d_iov_set(&riov, NULL, 0);
 			rc = dbtree_lookup(cont->vc_dtx_active_hdl, &kiov, &riov);
 			if (rc != 0)
 				goto out;
-
+			
+			//dtx和dae双向绑定
 			dae = riov.iov_buf; //dtx active entry
 			if (dae->dae_dth == NULL)  //back pointer to the DTX
 				dae->dae_dth = dth;
@@ -2879,6 +2884,7 @@ vos_dtx_attach(struct dtx_handle *dth, bool persistent, bool exist)
 	}
 
 	if (persistent) {
+		//如果需要持久化，就需要检查dae所在的blob空间是否足够？
 		struct vos_cont_df	*cont_df;
 
 		umm = vos_cont2umm(cont);
@@ -2898,9 +2904,9 @@ vos_dtx_attach(struct dtx_handle *dth, bool persistent, bool exist)
 			dbd = umem_off2ptr(umm, cont_df->cd_dtx_active_tail);
 		}
 	}
-
+	// related DTX entry is not exist
 	if (dth->dth_ent == NULL) {
-		rc = vos_dtx_alloc(dbd, dth);
+		rc = vos_dtx_alloc(dbd, dth); //alloc a dtx active entry
 	} else if (dbd != NULL) {
 		D_ASSERT(dbd->dbd_magic == DTX_ACT_BLOB_MAGIC);
 
@@ -2928,7 +2934,7 @@ out:
 		D_ERROR("Failed to pin DTX entry for "DF_DTI": "DF_RC"\n",
 			DP_DTI(&dth->dth_xid), DP_RC(rc));
 	}
-
+	//persistent相关
 	if (began) {
 		rc = umem_tx_end(umm, rc);
 		if (dce != NULL) {
