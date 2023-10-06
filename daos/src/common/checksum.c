@@ -813,7 +813,7 @@ daos_csummer_calc_iods(struct daos_csummer *obj, d_sg_list_t *sgls,
 		los = NULL;
 	else
 		los = singv_los;
-	rc = daos_csummer_alloc_iods_csums(obj, iods, nr, akey_only,
+	rc = daos_csummer_alloc_iods_csums(obj, iods, nr, akey_only, //set everything of iods_csums except real checksum
 					   los, &iods_csums/*out*/);
 	if (rc < 0) {
 		D_ERROR("daos_csummer_alloc_iods_csums error: "DF_RC"\n",

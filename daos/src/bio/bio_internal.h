@@ -455,6 +455,7 @@ is_blob_valid(struct bio_io_context *ctxt)
 	return ctxt->bic_blob != NULL && !ctxt->bic_closing;
 }
 
+//io unit就是blobstore的page大小，这边是4kB
 static inline uint64_t
 page2io_unit(struct bio_io_context *ctxt, uint64_t page)
 {

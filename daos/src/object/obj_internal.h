@@ -162,7 +162,7 @@ struct obj_reasb_req {
 	/* target bitmap, one bit for each target (from first data cell to last parity cell. */
 	uint8_t				*tgt_bitmap;
 	/* fetch stat, one per iod */
-	struct shard_fetch_stat		*orr_fetch_stat;
+	struct shard_fetch_stat		*orr_fetch_stat;  //1
 	struct obj_tgt_oiod		*tgt_oiods;
 	/* IO failure information */
 	struct obj_ec_fail_info		*orr_fail;
@@ -178,7 +178,7 @@ struct obj_reasb_req {
 	/* for snapshot data recovery flag */
 					 orr_recov_snap:1,
 	/* for iod_size fetching flag */
-					 orr_size_fetch:1,
+					 orr_size_fetch:1,  //需不需要size fetch
 	/* for iod_size fetched flag */
 					 orr_size_fetched:1,
 	/* only with single data target flag */

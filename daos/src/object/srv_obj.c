@@ -328,7 +328,7 @@ bulk_transfer_sgl(daos_handle_t ioh, crt_rpc_t *rpc, crt_bulk_t remote_bulk,
 	crt_bulk_t		local_bulk;
 	unsigned int		local_off;
 	unsigned int		iov_idx = 0;
-	size_t			remote_size;
+	size_t			remote_size;//remote bulk size
 	int			rc;
 
 	if (remote_bulk == NULL) {
@@ -386,7 +386,7 @@ bulk_transfer_sgl(daos_handle_t ioh, crt_rpc_t *rpc, crt_bulk_t remote_bulk,
 		if (local_bulk != NULL) {
 			unsigned int tmp_off;
 
-			length = sgl->sg_iovs[iov_idx].iov_len;
+			length = sgl->sg_iovs[iov_idx].iov_len;//server端数据大小
 			iov_idx++;
 			cached_bulk = true;
 
@@ -868,6 +868,7 @@ csum_add2iods(daos_handle_t ioh, daos_iod_t *iods, uint32_t iods_nr,
 	return rc;
 }
 
+//校验daos_iod_t list的key
 static int
 csum_verify_keys(struct daos_csummer *csummer, daos_key_t *dkey,
 		 struct dcs_csum_info *dkey_csum,
@@ -893,8 +894,8 @@ csum_verify_keys(struct daos_csummer *csummer, daos_key_t *dkey,
 		}
 	}
 
-	for (i = 0; i < oia->oia_iod_nr; i++) {
-		daos_iod_t		*iod = &oia->oia_iods[i];
+	for (i = 0; i < oia->oia_iod_nr; i++) {//遍历daos_iod
+		daos_iod_t		*iod = &oia->oia_iods[i]; //1个
 		struct dcs_iod_csums	*csum = &oia->oia_iod_csums[i];
 
 		if (!csum_iod_is_supported(iod))
@@ -906,7 +907,7 @@ csum_verify_keys(struct daos_csummer *csummer, daos_key_t *dkey,
 		if (csum->ic_nr > 0)
 			D_DEBUG(DB_CSUM, "first data csum: "DF_CI"\n", DP_CI(*csum->ic_data));
 
-		rc = daos_csummer_verify_key(csummer,
+		rc = daos_csummer_verify_key(csummer, //校验akey
 					     &iod->iod_name,
 					     &csum->ic_akey);
 		if (rc != 0) {
@@ -1302,7 +1303,7 @@ obj_local_rw_internal(crt_rpc_t *rpc, struct obj_io_context *ioc,
 		opc_get(rpc->cr_opc), DP_UOID(orw->orw_oid), DP_KEY(dkey),
 		tag, orw->orw_epoch);
 
-	rma = (orw->orw_bulks.ca_arrays != NULL ||  //orw_bulks看看这个数据结构
+	rma = (orw->orw_bulks.ca_arrays != NULL ||  
 	       orw->orw_bulks.ca_count != 0);
 	cond_flags = orw->orw_api_flags;
 
@@ -1428,7 +1429,7 @@ obj_local_rw_internal(crt_rpc_t *rpc, struct obj_io_context *ioc,
 		}
 
 		rc = vos_fetch_begin(ioc->ioc_vos_coh, orw->orw_oid,
-				     orw->orw_epoch, dkey, orw->orw_nr, iods,
+				     orw->orw_epoch, dkey, orw->orw_nr, iods/*per akey*/,
 				     cond_flags | fetch_flags, shadows, &ioh, dth);
 		daos_recx_ep_list_free(shadows, orw->orw_nr);
 		if (rc) {
@@ -1549,7 +1550,7 @@ obj_local_rw_internal(crt_rpc_t *rpc, struct obj_io_context *ioc,
 		bulk_bind = orw->orw_flags & ORF_BULK_BIND;
 		rc = obj_bulk_transfer(rpc, bulk_op, bulk_bind,    //rdma写数据
 				       orw->orw_bulks.ca_arrays, offs,
-				       ioh, NULL, orw->orw_nr, NULL, ioc->ioc_coh);
+				       ioh, NULL/*sgls*/, orw->orw_nr, NULL, ioc->ioc_coh);
 		if (rc == 0) {
 			bio_iod_flush(biod);
 
@@ -2516,10 +2517,10 @@ ds_obj_rw_handler(crt_rpc_t *rpc)
 		D_GOTO(out, rc);
 	}
 	// update operation
-	tgts = orw->orw_shard_tgts.ca_arrays;//daos_shard_tgt
+	tgts = orw->orw_shard_tgts.ca_arrays;//struct daos_shard_tgt
 	tgt_cnt = orw->orw_shard_tgts.ca_count;//
 
-	if (!daos_is_zero_dti(&orw->orw_dti) && tgt_cnt != 0) {
+	if (!daos_is_zero_dti(&orw->orw_dti) && tgt_cnt != 0) { //DTX事务的HLC == 0
 		rc = obj_gen_dtx_mbs(orw->orw_flags, &tgt_cnt, &tgts, &mbs);  //获取dtx涉及到的tgt member
 		if (rc != 0)
 			D_GOTO(out, rc);

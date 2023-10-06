@@ -1227,7 +1227,7 @@ dc_obj_shard_rw(struct dc_obj_shard *shard, enum obj_rpc_opc opc,
 	if (DAOS_FAIL_CHECK(DAOS_SHARD_OBJ_FAIL))
 		D_GOTO(out_req, rc = -DER_INVAL);
 
-	orw = crt_req_get(req);
+	orw = crt_req_get(req);//request buffer
 	D_ASSERT(orw != NULL);
 
 	if (fw_shard_tgts != NULL) {

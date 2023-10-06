@@ -295,7 +295,7 @@ enum evt_feats {
 /* Information about record to insert */
 struct evt_entry_in {
 	/** Extent to insert */
-	struct evt_rect		ei_rect;
+	struct evt_rect		ei_rect; //retangle
 	/** checksum of entry */
 	struct dcs_csum_info	ei_csum;
 	/** epoch uncertainty boundary */

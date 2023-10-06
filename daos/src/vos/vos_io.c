@@ -500,7 +500,7 @@ vos_ioc2ioh(struct vos_io_context *ioc)
 {
 	daos_handle_t ioh;
 
-	ioh.cookie = (uint64_t)ioc;
+	ioh.cookie = (uint64_t)ioc; //将指针类型转换为uint64
 	return ioh;
 }
 
@@ -992,7 +992,7 @@ akey_fetch_recx(daos_handle_t toh, const daos_epoch_range_t *epr,
 			if (rc != 0)
 				goto failed;
 		}
-		bio_iov_set(&biov, ent->en_addr, nr * inob);
+		bio_iov_set(&biov, ent->en_addr, nr * inob); //设置biov
 		ioc->ic_io_size += nr * inob;
 		if (ci_is_valid(&ent->en_csum)) {
 			rc = save_csum(ioc, &ent->en_csum, ent, rsize);
@@ -1209,7 +1209,7 @@ akey_fetch(struct vos_io_context *ioc, daos_handle_t ak_toh)
 		flags |= SUBTR_EVT;
 	}
 
-	rc = key_tree_prepare(ioc->ic_obj, ak_toh,   //返回的应该是sv tree/evt tree
+	rc = key_tree_prepare(ioc->ic_obj, ak_toh,
 			      VOS_BTR_AKEY, &iod->iod_name/*key*/, flags,
 			      DAOS_INTENT_DEFAULT, &krec,
 			      (ioc->ic_check_existence || ioc->ic_read_ts_only) ? NULL : &toh/*akey tree toh*/,

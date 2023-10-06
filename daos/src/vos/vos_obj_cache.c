@@ -334,7 +334,7 @@ vos_obj_hold(struct daos_lru_cache *occ, struct vos_container *cont,
 	lkey.olk_oid = oid;
 
 	rc = daos_lru_ref_hold(occ, &lkey, sizeof(lkey), create_flag, &lret);//在lcache中找到lkey的引用，如果找不到就创建
-	if (rc == -DER_NONEXIST) {
+	if (rc == -DER_NONEXIST) { //find only操作，但是没找到
 		D_ASSERT(obj_local.obj_cont == NULL);
 		obj = &obj_local;
 		init_object(obj, oid, cont);
@@ -390,7 +390,7 @@ vos_obj_hold(struct daos_lru_cache *occ, struct vos_container *cont,
 	} else {
 
 		rc = vos_oi_find_alloc(cont, oid, epr->epr_hi, false,
-				       &obj->obj_df, ts_set);
+				       &obj->obj_df, ts_set); //在vos index tree中增加obj_df
 		D_ASSERT(rc || obj->obj_df);
 	}
 

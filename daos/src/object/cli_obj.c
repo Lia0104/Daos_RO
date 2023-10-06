@@ -110,10 +110,11 @@ struct obj_auxi_args {
 	uint32_t			 retry_cnt;
 	uint32_t			 padding;
 	d_list_t			 shard_task_head;
-	struct obj_reasb_req		 reasb_req;
+	struct obj_reasb_req		 reasb_req; //reasemble
 	struct obj_auxi_tgt_list	*failed_tgt_list;
 	/* one shard_args embedded to save one memory allocation if the obj
 	 * request only targets for one shard.
+	 * 用于在只涉及到1个shard的场景下节约内存分配的开销
 	 */
 	union {
 		struct shard_rw_args	 rw_args;
@@ -962,10 +963,10 @@ obj_reasb_req_init(struct obj_reasb_req *reasb_req, struct dc_object *obj, daos_
 		return -DER_NOMEM;
 
 	tmp_ptr = buf;
-	reasb_req->orr_iods = (void *)tmp_ptr;
+	reasb_req->orr_iods = (void *)tmp_ptr; 
 	tmp_ptr += size_iod;
 	reasb_req->orr_sgls = (void *)tmp_ptr;
-	tmp_ptr += size_sgl;
+	tmp_ptr += size_sgl;					
 	reasb_req->orr_oiods = (void *)tmp_ptr;
 	tmp_ptr += size_oiod;
 	reasb_req->orr_recxs = (void *)tmp_ptr;
@@ -1048,7 +1049,7 @@ obj_rw_req_reassemb(struct dc_object *obj, daos_obj_rw_t *args,
 
 	/** XXX possible re-order/merge for both replica and EC */
 	if (args->extra_flags & DIOF_CHECK_EXISTENCE ||
-	    args->extra_flags & DIOF_TO_SPEC_SHARD || !obj_is_ec(obj))
+	    args->extra_flags & DIOF_TO_SPEC_SHARD || !obj_is_ec(obj))  //replica obj这里就返回了
 		return 0;
 
 	if (!obj_auxi->req_reasbed) {
@@ -2780,12 +2781,12 @@ obj_req_get_tgts(struct dc_object *obj, int *shard, daos_key_t *dkey,
 	switch (opc) {
 	case DAOS_OBJ_RPC_FETCH:
 
-		is_ec_check_exist = obj_req_is_ec_check_exist(obj_auxi);
+		is_ec_check_exist = obj_req_is_ec_check_exist(obj_auxi);//必须是ec obj
 		if (is_ec_check_exist) {
 			D_ASSERT(obj_req_is_ec_cond_fetch(obj_auxi));
 			flags |= OBJ_TGT_FLAG_EC_CHECK_EXIST;
 		}
-		if (bit_map == NIL_BITMAP && !is_ec_check_exist) {
+		if (bit_map == NIL_BITMAP && !is_ec_check_exist) { // replica obj走这
 			if (spec_shard) {
 				D_ASSERT(shard != NULL);
 
@@ -3327,7 +3328,7 @@ next:
 		if (req_tgts->ort_srv_disp)
 			tgt += req_tgts->ort_grp_size;
 		else
-			tgt++;
+			tgt++; //next target
 	}
 
 	obj_auxi->args_initialized = 1;
@@ -4982,7 +4983,7 @@ obj_task_init_common(tse_task_t *task, int opc, uint32_t map_ver,
 	struct obj_auxi_args	*obj_auxi;
 
 	obj_auxi = tse_task_stack_push(task, sizeof(*obj_auxi));
-	if (obj_is_modification_opc(opc))
+	if (obj_is_modification_opc(opc))  //设计updaete或者punch的操作
 		obj_auxi->spec_group = 0;
 	obj_auxi->opc = opc;
 	obj_auxi->map_ver_req = map_ver;
@@ -5045,7 +5046,7 @@ shard_rw_prep(struct shard_auxi_args *shard_auxi, struct dc_object *obj,
 	shard_arg->bulks		= obj_auxi->bulks;
 	if (obj_auxi->req_reasbed) {
 		reasb_req = &obj_auxi->reasb_req;
-		if (reasb_req->tgt_oiods != NULL) {
+		if (reasb_req->tgt_oiods != NULL) { // only for ec obj
 			D_ASSERT(obj_auxi->opc == DAOS_OBJ_RPC_FETCH);
 			toiod = obj_ec_tgt_oiod_get(
 				reasb_req->tgt_oiods, reasb_req->orr_tgt_nr,
@@ -5295,6 +5296,7 @@ obj_retry_next_shard(struct dc_object *obj, struct obj_auxi_args *obj_auxi,
 /* pre-process for cond_fetch -
  * for multiple-akeys case, split obj task to multiple sub-tasks each for one akey. For this
  * case return 1 to indicate wait sub-tasks' completion.
+ * 这里1个task是对1个dkey的读写task
  */
 static int
 obj_cond_fetch_prep(tse_task_t *task, struct obj_auxi_args *obj_auxi)
@@ -5318,9 +5320,9 @@ obj_cond_fetch_prep(tse_task_t *task, struct obj_auxi_args *obj_auxi)
 	 * Now one fetch request only with one return code. So creates one sub-task for each akey.
 	 */
 	D_ASSERT(d_list_empty(task_list));
-	D_ASSERT(obj_auxi->cond_fetch_split == 0);
+	D_ASSERT(obj_auxi->cond_fetch_split == 0); //0表示还未分割成sub tasks
 	for (i = 0; i < args->nr; i++) {
-		fetch_flags = per_akey ? args->iods[i].iod_flags : args->flags;
+		fetch_flags = per_akey ? args->iods[i].iod_flags : args->flags;// per akey flag or global flag
 		sgl = args->sgls != NULL ? &args->sgls[i] : NULL;
 		rc = dc_obj_fetch_task_create(args->oh, obj_auxi->th, fetch_flags, args->dkey, 1,
 					      0, &args->iods[i], sgl, NULL, NULL, NULL,
@@ -5388,7 +5390,7 @@ dc_obj_fetch_task(tse_task_t *task)
 
 	obj_auxi->rw_args.api_args = args;
 	if (obj_req_with_cond_flags(args->flags)) {
-		rc = obj_cond_fetch_prep(task, obj_auxi);
+		rc = obj_cond_fetch_prep(task, obj_auxi); // conditional fetch
 		D_ASSERT(rc <= 1);
 		if (rc < 0)
 			D_GOTO(out_task, rc);
@@ -5454,7 +5456,8 @@ dc_obj_fetch_task(tse_task_t *task)
 		obj_auxi->to_leader = (args->extra_flags & DIOF_TO_LEADER) != 0;
 	}
 
-	if ((obj_auxi->csum_retry || obj_auxi->tx_uncertain) &&
+	// 1.replica obj 2. 上一个shard不满足条件，如tx uncertain或csum出错
+	if ((obj_auxi->csum_retry || obj_auxi->tx_uncertain) && 
 	    !obj_auxi->is_ec_obj) {
 		rc = obj_retry_next_shard(obj, obj_auxi, dkey_hash, map_ver);
 		if (rc)

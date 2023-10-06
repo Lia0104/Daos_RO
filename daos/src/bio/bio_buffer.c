@@ -1084,8 +1084,8 @@ nvme_rw(struct bio_desc *biod, struct bio_rsrvd_region *rg)
 					   rw_completion, biod); //回调函数及其参数
 		else
 			spdk_blob_io_read(blob, channel, payload,
-					  page2io_unit(biod->bd_ctxt, pg_idx),
-					  page2io_unit(biod->bd_ctxt, rw_cnt),
+					  page2io_unit(biod->bd_ctxt, pg_idx),//offset
+					  page2io_unit(biod->bd_ctxt, rw_cnt),//length
 					  rw_completion, biod);
 
 		pg_cnt -= rw_cnt;

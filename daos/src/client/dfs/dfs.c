@@ -4053,7 +4053,7 @@ dfs_read_int(dfs_t *dfs, dfs_obj_t *obj, daos_off_t off, dfs_iod_t *iod,
 	args->iod	= &params->arr_iod;
 
 	daos_task_set_priv(task, params);
-	rc = tse_task_register_cbs(task, NULL, 0, 0, read_cb, NULL, 0);
+	rc = tse_task_register_cbs(task, NULL, 0, 0, read_cb/*comp_cb*/, NULL, 0);
 	if (rc)
 		D_GOTO(err_params, rc = daos_der2errno(rc));
 
@@ -4068,7 +4068,7 @@ err_task:
 
 int
 dfs_read(dfs_t *dfs, dfs_obj_t *obj, d_sg_list_t *sgl, daos_off_t off,
-	 daos_size_t *read_size, daos_event_t *ev)
+	 daos_size_t *read_size/*actually read*/, daos_event_t *ev)
 {
 	daos_size_t		buf_size;
 	int			i, rc;

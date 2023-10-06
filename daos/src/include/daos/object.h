@@ -211,7 +211,7 @@ struct daos_shard_tgt_20 {
 
 /* For 2.2 or newer */
 struct daos_shard_tgt {
-	uint32_t		st_rank;	/* rank of the shard */
+	uint32_t		st_rank;	/* rank of the shard rank是在group中的idx？？*/ 
 	uint32_t		st_shard;	/* shard index */
 	uint32_t		st_shard_id;	/* shard id */
 	uint32_t		st_tgt_id;	/* target id */

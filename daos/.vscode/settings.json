@@ -31,6 +31,10 @@
         "type_traits": "c",
         "utility": "c",
         "cstdlib": "c",
-        "abt.h": "c"
+        "abt.h": "c",
+        "new": "c",
+        "lru.h": "c",
+        "telemetry_producer.h": "c",
+        "bio.h": "c"
     }
 }

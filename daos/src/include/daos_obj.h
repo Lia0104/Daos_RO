@@ -267,7 +267,7 @@ enum {
 	 * flag should not have any akey conditional ops specified. The
 	 * per akey flags will be read from the iod_flags field.
 	 */
-	DAOS_COND_PER_AKEY = (1 << 7),
+	DAOS_COND_PER_AKEY = (1 << 7), //置1表示所有的akey iod有独立的flag，置0表示整个dkey的所有akey iod用共同的flag
 	/** Mask for convenience */
 	DAOS_COND_MASK = ((1 << IO_FLAGS_COND_BITS) - 1),
 };

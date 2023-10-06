@@ -1497,7 +1497,7 @@ dc_array_io(daos_handle_t array_oh, daos_handle_t th,
 			record_i);
 
 		/** allocate params for this dkey io */
-		D_ALLOC_PTR(params);
+		D_ALLOC_PTR(params); //与本次dkey io相关的所有参数
 		if (params == NULL)
 			D_GOTO(err_iotask, rc = -DER_NOMEM);
 		params->dkey_val = dkey_val;
@@ -1506,6 +1506,7 @@ dc_array_io(daos_handle_t array_oh, daos_handle_t th,
 		 * since we probably have multiple dkey ios, put them in linked
 		 * list to free later. Insert in decreasing order for easier
 		 * short fetch detection.
+		 * 降序排列
 		 */
 		if (num_ios == 0) {
 			head = params;
@@ -1544,12 +1545,12 @@ dc_array_io(daos_handle_t array_oh, daos_handle_t th,
 		params->user_sgl_used	= false;
 		params->cell_size	= array->cell_size;
 		params->chunk_size	= array->chunk_size;
-		num_ios++;
+		num_ios++;//per dkey
 
 		/** Set integer dkey descriptor */
 		d_iov_set(dkey, &params->dkey_val, sizeof(uint64_t));
 		/** Set character akey descriptor - TODO: should be NULL*/
-		d_iov_set(&iod->iod_name, &params->akey_val, 1);
+		d_iov_set(&iod->iod_name, &params->akey_val, 1); //array object的akey应该为NULL，或者只能为'0'
 		/** Initialize the rest of the IOD fields */
 		iod->iod_nr	= 0;
 		iod->iod_recxs	= NULL;

@@ -1348,7 +1348,7 @@ out:
 }
 
 int
-crt_req_send(crt_rpc_t *req, crt_cb_t complete_cb, void *arg)
+crt_req_send(crt_rpc_t *req, crt_cb_t complete_cb, void *arg/*arg of complete_cb*/)
 {
 	struct crt_rpc_priv	*rpc_priv = NULL;
 	int			 rc = 0;

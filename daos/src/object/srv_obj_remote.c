@@ -104,11 +104,11 @@ ds_obj_remote_update(struct dtx_leader_handle *dlh, void *data, int idx,
 	if (remote_arg == NULL)
 		D_GOTO(out, rc = -DER_NOMEM);
 
-	tgt_ep.ep_grp = NULL;
+	tgt_ep.ep_grp = NULL; //primary group
 	tgt_ep.ep_rank = shard_tgt->st_rank;
 	tgt_ep.ep_tag = shard_tgt->st_tgt_idx;
 
-	remote_arg->dlh = dlh;
+	remote_arg->dlh = dlh; //crt send的回调函数的参数
 	remote_arg->comp_cb = comp_cb;
 	remote_arg->idx = idx;
 	crt_req_addref(parent_req);
@@ -134,13 +134,13 @@ ds_obj_remote_update(struct dtx_leader_handle *dlh, void *data, int idx,
 		orw->orw_iod_array.oia_oiod_nr = orw->orw_iod_array.oia_iod_nr;
 		orw->orw_iod_array.oia_offs = tgt_oiod->oto_offs;
 	}
-	orw->orw_oid.id_shard = shard_tgt->st_shard_id;
-	uuid_copy(orw->orw_co_hdl, orw_parent->orw_co_hdl);
-	uuid_copy(orw->orw_co_uuid, orw_parent->orw_co_uuid);
-	orw->orw_shard_tgts.ca_count	= orw_parent->orw_shard_tgts.ca_count;
+	orw->orw_oid.id_shard = shard_tgt->st_shard_id; //object shard id
+	uuid_copy(orw->orw_co_hdl, orw_parent->orw_co_hdl); // container handler
+	uuid_copy(orw->orw_co_uuid, orw_parent->orw_co_uuid);// container uuid
+	orw->orw_shard_tgts.ca_count	= orw_parent->orw_shard_tgts.ca_count;//shard target list
 	orw->orw_shard_tgts.ca_arrays	= orw_parent->orw_shard_tgts.ca_arrays;
 	orw->orw_flags |= ORF_BULK_BIND | obj_exec_arg->flags;
-	orw->orw_dti_cos.ca_count	= dth->dth_dti_cos_count;
+	orw->orw_dti_cos.ca_count	= dth->dth_dti_cos_count; //committable cache
 	orw->orw_dti_cos.ca_arrays	= dth->dth_dti_cos;
 
 	D_DEBUG(DB_TRACE, DF_UOID" forwarding to rank:%d tag:%d.\n",
